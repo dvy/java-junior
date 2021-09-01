@@ -1,5 +1,9 @@
 package demo;
 
+import java.io.Closeable;
+import java.io.IOException;
+import java.sql.SQLException;
+
 public class ExceptionsDemo {
     public static void main(String[] args) {
         //RQ + domain: main flow VS alternate flow
@@ -8,6 +12,8 @@ public class ExceptionsDemo {
             new Controller().log("null");
         } catch (RuntimeException e) { //LogOperationException IS-A RuntExc
             //User communication
+            e.printStackTrace();
+        } catch (LogOperationException e) {
             e.printStackTrace();
         }
     }
@@ -18,7 +24,7 @@ public class ExceptionsDemo {
  * API
  */
 class Controller {
-    public void log(String message) {
+    public void log(String message) throws LogOperationException {
         if (message == null || message.isEmpty()) {
             throw new IllegalArgumentException("message not valid");
         }
@@ -37,27 +43,35 @@ class Controller {
  * "Service": business logic
  */
 class Service {
-    public void log(String message) {
-        try {
-            new Repo().save(message);
+    public void log(String message) throws LogOperationException {
+        try (Repo repo = new Repo()) { //Constructor || Factory Method e.g. _open_
+            repo.save(message); // -> RuntExc
+            return;
             //....
-            //....
-        } catch (RuntimeException e) {
+        } catch (ArithmeticException | NullPointerException e) {
+                //....
+                //....
+                //....
+        } catch (Exception e) { // -> RuntExc!!!!
 //            1. Full handing: Retrying, Redundency -> NRFs (fail-over)
-//            2. Fail: raw case exception VS wrapper/business exception
-            throw new LogOperationException("business message", e);
-        }
-        //.....
+//            2. Fail: log + raw case exception VS wrapper/business exception
+            throw new LogOperationException("business operation exception", e);
+        } // finally with close()
     }
 }
 
-class Repo {
-    public void save(String message) {
-        throw new RuntimeException("low-level message");
+class Repo implements AutoCloseable {
+    public void save(String message) throws IOException {
+        throw new IOException("low-level exception");
+    }
+
+    @Override
+    public void close() throws Exception {
+        throw new Exception("close exception");
     }
 }
 
-class LogOperationException extends RuntimeException {
+class LogOperationException extends Exception {
     public LogOperationException() {
         super();
     }
